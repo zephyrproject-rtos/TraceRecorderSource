@@ -18,10 +18,10 @@ menu "Percepio Trace Recorder"
 			Trace recorder operates in snapshot or streaming mode. This option selects
 			the mode but is limited to streaming mode when running SMP.
 
-		#config PERCEPIO_TRC_RECORDER_MODE_SNAPSHOT
-		#	bool "Snapshot"
-		#	help
-		#		Snapshot recorder mode allow the used to capture an instant snapshot of the systems state for a short period of time.
+		config PERCEPIO_TRC_RECORDER_MODE_SNAPSHOT
+			bool "Snapshot [Not supported]"
+			help
+		          Snapshot recorder mode allow the used to capture an instant snapshot of the systems state for a short period of time.
 
 		config PERCEPIO_TRC_RECORDER_MODE_STREAMING
 			bool "Streaming"
