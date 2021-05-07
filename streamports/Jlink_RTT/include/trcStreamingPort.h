@@ -95,7 +95,7 @@ extern "C" {
  * Tracealyzer will report lost events if the transfer is not
  * fast enough. In that case, try increasing the size of the "up buffer".
  ******************************************************************************/
-#define TRC_CFG_RTT_MODE SEGGER_RTT_MODE_NO_BLOCK_SKIP
+#define TRC_CFG_RTT_MODE SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
 
 #include "SEGGER_RTT_Conf.h"
 #include "SEGGER_RTT.h"
