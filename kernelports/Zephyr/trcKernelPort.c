@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.5.0b
+ * Trace Recorder for Tracealyzer v989.878.767
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -840,7 +840,7 @@ void sys_trace_k_mutex_init(struct k_mutex *mutex, int ret) {
 	/* If we use Zephyr RTT we have to ignore tracing of their locking
 	 * mutex or we will end up in a recursive trace loop
 	 */
-	//if (mutex == &rtt_term_mutex) return;
+	if (mutex == &rtt_term_mutex) return;
 	
 	xTraceSDKEventBegin(PSF_EVENT_MUTEX_CREATE, 8);
 	xTraceSDKEventAddObject((void*)mutex);
@@ -855,7 +855,7 @@ void sys_trace_k_mutex_lock_blocking(struct k_mutex *mutex, k_timeout_t timeout)
 	/* If we use Zephyr RTT we have to ignore tracing of their locking
 	 * mutex or we will end up in a recursive trace loop
 	 */
-	//if (mutex == &rtt_term_mutex) return;
+	if (mutex == &rtt_term_mutex) return;
 
 	xTraceSDKEventBegin(PSF_EVENT_MUTEX_TAKE_BLOCK, 8);
 	xTraceSDKEventAddObject((void*)mutex);
@@ -867,7 +867,7 @@ void sys_trace_k_mutex_lock_exit(struct k_mutex *mutex, k_timeout_t timeout, int
 	/* If we use Zephyr RTT we have to ignore tracing of their locking
 	 * mutex or we will end up in a recursive trace loop
 	 */
-	//if (mutex == &rtt_term_mutex) return;
+	if (mutex == &rtt_term_mutex) return;
 
 	if (ret == 0) {
 		xTraceSDKEventBegin(PSF_EVENT_MUTEX_TAKE, 12);
@@ -888,7 +888,7 @@ void sys_trace_k_mutex_unlock_exit(struct k_mutex *mutex, int ret) {
 	/* If we use Zephyr RTT we have to ignore tracing of their locking
 	 * mutex or we will end up in a recursive trace loop
 	 */
-	//if (mutex == &rtt_term_mutex) return;
+	if (mutex == &rtt_term_mutex) return;
 
 	if (ret == 0) {
 		xTraceSDKEventBegin(PSF_EVENT_MUTEX_GIVE, 8);
@@ -2335,5 +2335,5 @@ static int tracealyzer_post_kernel_init(const struct device *arg)
 }
 
 /* Specify recorder module initialization stages */
-SYS_INIT(tracelyzer_pre_kernel_init, PRE_KERNEL_2, 0);
+SYS_INIT(tracelyzer_pre_kernel_init, PRE_KERNEL_1, 0);
 SYS_INIT(tracealyzer_post_kernel_init, POST_KERNEL, 0);
