@@ -80,7 +80,7 @@ extern "C" {
  *
  * Note: not used by the J-Link RTT stream port (see trcStreamingPort.h instead)
  */
-#ifdef PERCEPIO_RECORDER_TRC_STREAM_PORT_USE_INTERNAL_BUFFER
+#ifdef CONFIG_PERCEPIO_RECORDER_TRC_STREAM_PORT_USE_INTERNAL_BUFFER
 #define TRC_CFG_PAGED_EVENT_BUFFER_PAGE_COUNT CONFIG_PERCEPIO_RECORDER_TRC_CFG_PAGED_EVENT_BUFFER_PAGE_COUNT
 #else
 #define TRC_CFG_PAGED_EVENT_BUFFER_PAGE_COUNT 10
@@ -95,7 +95,7 @@ extern "C" {
  *
  * Note: not used by the J-Link RTT stream port (see trcStreamingPort.h instead)
  */
-#ifdef PERCEPIO_RECORDER_TRC_STREAM_PORT_USE_INTERNAL_BUFFER
+#ifdef CONFIG_PERCEPIO_RECORDER_TRC_STREAM_PORT_USE_INTERNAL_BUFFER
 #define TRC_CFG_PAGED_EVENT_BUFFER_PAGE_SIZE CONFIG_PERCEPIO_RECORDER_TRC_CFG_PAGED_EVENT_BUFFER_PAGE_SIZE
 #else
 #define TRC_CFG_PAGED_EVENT_BUFFER_PAGE_SIZE 500
@@ -125,6 +125,18 @@ extern "C" {
  * trcStreamingConfig.h, since it is affected by the recorder mode.
  */
 #define TRC_CFG_ISR_TAILCHAINING_THRESHOLD CONFIG_PERCEPIO_RECORDER_TRC_CFG_ISR_TAILCHAINING_THRESHOLD_STREAMING
+
+/**
+ * @def TRC_CFG_INCLUDE_ISR_TRACING
+ * 
+ * @brief Macro which should be defined as an integer value.
+ * 
+ * If set to 1, trace recorder will include ISR tracing events, for Zephyr
+ * this follows the systemwide tracing configuration.
+ */
+#ifdef CONFIG_TRACING_ISR
+#define TRC_CFG_INCLUDE_ISR_TRACING 1
+#endif
 
 /**
  * @}

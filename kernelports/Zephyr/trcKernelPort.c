@@ -14,10 +14,31 @@
 #include "trcKernelPort.h"
 #include "trcRecorder.h"
 #include "trcSDK.h"
+#include "trcInternalBuffer.h"
+
 
 /* Streaming specific macros */
 #if ((TRC_CFG_RECORDER_MODE) == TRC_RECORDER_MODE_STREAMING)
-	#define TRC_PORT_MALLOC(size) k_malloc(size)
+	/* Ensure that CONFIG_MEM_POOL has been set when the user selects dynamic
+	 * allocation of the recorder buffer.
+	 */
+	#if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC)
+		
+		/* While we could add CONFIG_KERNEL_MEM_POOL as a dependency for the 
+		 * dynamic allocation option, we have opted to output and error if 
+		 * the user have forgotten this since they also have to specify an
+		 * appropriate size for the kernel memory pool.
+		 */
+		#ifndef CONFIG_KERNEL_MEM_POOL
+			#error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without enabling KERNEL_MEM_POOL in Zephyr. Enable this option and allocate an appropriate size."
+		#endif
+
+		#if !defined(CONFIG_HEAP_MEM_POOL_SIZE) || ((CONFIG_HEAP_MEM_POOL_SIZE) < ((TRC_CFG_RTT_BUFFER_SIZE_UP) + (TRC_CFG_RTT_BUFFER_SIZE_DOWN)))
+			#error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without allocating enough memory for the KERNEL_MEM_POOL in Zephyr"
+		#endif
+
+		#define TRC_PORT_MALLOC(size) k_malloc(size)
+	#endif
 #endif
 
 #if ((TRC_CFG_RECORDER_MODE) == TRC_RECORDER_MODE_STREAMING || ((TRC_CFG_ENABLE_STACK_MONITOR) == 1) && (TRC_CFG_SCHEDULING_ONLY == 0))
@@ -33,6 +54,9 @@ static struct k_thread HandleTzCtrl;
 
 /* Trace recorder current thread handle */
 static struct k_thread *CurrentThread = NULL;
+
+/* Generic Zephyr ISR handle */
+static traceHandle HandleISR;
 
 #endif /* ((TRC_CFG_RECORDER_MODE) == TRC_RECORDER_MODE_STREAMING || ((TRC_CFG_ENABLE_STACK_MONITOR) == 1) && (TRC_CFG_SCHEDULING_ONLY == 0)) */
 
@@ -148,6 +172,8 @@ void sys_trace_k_thread_create(struct k_thread *thread, size_t stack_size, int p
 #endif
 	xTraceSDKSetObjectData((void*)thread, prio);
 
+	prvAddTaskToStackMonitor((void*)thread);
+
 	xTraceSDKEventBegin(PSF_EVENT_THREAD_INIT, 12);
 	xTraceSDKEventAddObject((void*)thread);
 	xTraceSDKEventAdd32((uint32_t)stack_size);
@@ -254,6 +280,8 @@ void sys_trace_k_thread_wakeup(struct k_thread *thread) {
 }
 
 void sys_trace_k_thread_abort(struct k_thread *thread) {
+	prvRemoveTaskFromStackMonitor(thread);
+
 	xTraceSDKEventBegin(PSF_EVENT_THREAD_ABORT, 4);
 	xTraceSDKEventAddObject((void*)thread);
 	xTraceSDKEventEnd();
@@ -1064,7 +1092,15 @@ void sys_trace_k_queue_insert_enter(struct k_queue *queue, void *prev, void *dat
 void sys_trace_k_queue_insert_exit(struct k_queue *queue, void *prev, void *data) {
 }
 
-void sys_trace_k_queue_append_list_exit(struct k_queue *queue, void *head, void *tail, int ret) {
+void sys_trace_k_queue_append_list_enter(struct k_queue *queue, void *head, void *tail) {
+	xTraceSDKEventBegin(PSF_EVENT_QUEUE_APPEND_LIST_BLOCKING, 12);
+	xTraceSDKEventAddObject((void*)queue);
+	xTraceSDKEventAdd32((uint32_t)head);
+	xTraceSDKEventAdd32((uint32_t)tail);
+	xTraceSDKEventEnd();
+}
+
+void sys_trace_k_queue_append_list_exit(struct k_queue *queue, int ret) {
 	if (ret == 0) {
 		xTraceSDKEventBegin(PSF_EVENT_QUEUE_APPEND_LIST_SUCCESS, 16);
 	} else {
@@ -1072,8 +1108,6 @@ void sys_trace_k_queue_append_list_exit(struct k_queue *queue, void *head, void 
 	}
 	
 	xTraceSDKEventAddObject((void*)queue);
-	xTraceSDKEventAdd32((uint32_t)head);
-	xTraceSDKEventAdd32((uint32_t)tail);
 	xTraceSDKEventAdd32(ret);
 	xTraceSDKEventEnd();
 }
@@ -2095,9 +2129,11 @@ void sys_trace_syscall_exit() {
  * the Zephyr team.
  */
 void sys_trace_isr_enter(void) {
+	vTraceStoreISRBegin(HandleISR);
 }
 
 void sys_trace_isr_exit(void) {
+	vTraceStoreISREnd(0);
 }
 
 void sys_trace_isr_exit_to_scheduler(void) {
@@ -2285,6 +2321,9 @@ static int tracelyzer_pre_kernel_init(const struct device *arg)
 #else
 	vTraceEnable(TRC_INIT);
 #endif
+
+	/* Create ISR handle */
+	HandleISR = xTraceSetISRProperties("Zephyr ISR", -32);
 
 	return 0;
 }
