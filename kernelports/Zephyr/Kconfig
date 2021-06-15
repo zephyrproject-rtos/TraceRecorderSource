@@ -184,7 +184,6 @@ menu "Percepio Trace Recorder"
 			config PERCEPIO_RECORDER_TRC_RECORDER_STREAM_PORT_RTT
 				depends on ARM
 				bool "RTT Streaming"
-				select USE_SEGGER_RTT
 
 			#config PERCEPIO_RECORDER_TRC_RECORDER_STREAM_PORT_ITM
 			#	depends on ARM
