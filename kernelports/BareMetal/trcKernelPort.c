@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.5.0b
+ * Trace Recorder for Tracealyzer v4.5.0
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -11,7 +11,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "trcRecorder.h"
-
+#include "trcInternalBuffer.h"
 
 #if (TRC_CFG_RECORDER_MODE == TRC_RECORDER_MODE_STREAMING)
 	

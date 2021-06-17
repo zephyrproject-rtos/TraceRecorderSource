@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.5.0b
+ * Trace Recorder for Tracealyzer v4.5.0
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -105,4 +105,6 @@
 #define TRC_HARDWARE_PORT_POWERPC_Z4                    17  /*  No          FreeRTOS            */
 #define TRC_HARDWARE_PORT_Altera_NiosII					18  /*  Yes          Any (Tested with FreeRTOS)                 */
 #define TRC_HARDWARE_PORT_ZEPHYR                        19  /*  Yes         Zephyr              */
+#define TRC_HARDWARE_PORT_XTensa_LX6                    20  /*  Yes         ESP-IDF FreeRTOS    */
+#define TRC_HARDWARE_PORT_XTensa_LX7                    21  /*  Yes         ESP-IDF FreeRTOS    */
 #endif /*TRC_PORTDEFINES_H*/

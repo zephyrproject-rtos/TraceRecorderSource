@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.5.0b
+ * Trace Recorder for Tracealyzer v4.5.0
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -1749,6 +1749,10 @@ if (!(eval)) \
 			prvPagedEventBufferInit(_TzTraceData);
 #endif
 
+#ifndef TRC_STREAM_PORT_INTERNAL_BUFFER_INIT
+	#define TRC_STREAM_PORT_INTERNAL_BUFFER_INIT() prvPagedEventBufferInit(_TzTraceData);
+#endif
+
 
 /* Signal an error. */
 void prvTraceError(int errCode);
@@ -1796,6 +1800,12 @@ void prvTraceSaveObjectData(const void *address, uint32_t data);
 /* Removes an object data entry (task base priority) from object data table */
 void prvTraceDeleteObjectData(void *address);
 
+/* Gets the most recent tcb address */
+uint32_t prvTraceGetCurrentTask(void);
+
+/* Sets the most recent tcb address */
+void prvTraceSetCurrentTask(uint32_t tcb);
+
 /* Begins an event with defined specified payload size. Must call prvTraceEndStoreEvent() to finalize event creation. */
 uint32_t prvTraceBeginStoreEvent(uint32_t uiEventCode, uint32_t uiTotalPayloadSize);
 
@@ -1837,15 +1847,6 @@ void prvTraceStoreEvent(int nParam, uint16_t EventID, ...);
 
 /* Stories an event with a string and <nParam> 32-bit integer parameters */
 void prvTraceStoreStringEvent(int nArgs, uint16_t eventID, const char* str, ...);
-
-/* Initializes the paged event buffer used by certain stream ports */
-void prvPagedEventBufferInit(char* buffer);
-
-/* Retrieve a pointer to the paged event buffer */
-void* prvPagedEventBufferGetWritePointer(int sizeOfEvent);
-
-/* Transfer a full buffer page */
-uint32_t prvPagedEventBufferTransfer(void);
 
 /* The data structure for commands (a bit overkill) */
 typedef struct
