@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.0(RC0)
+ * Trace Recorder for Tracealyzer v4.6.0(RC1)
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -15,24 +15,24 @@
 
 
 /* Ensure that CONFIG_MEM_POOL has been set when the user selects dynamic
-	 * allocation of the recorder buffer.
-	 */
+ * allocation of the recorder buffer.
+ */
 #if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC)
-		
-		/* While we could add CONFIG_KERNEL_MEM_POOL as a dependency for the 
-		 * dynamic allocation option, we have opted to output and error if 
-		 * the user have forgotten this since they also have to specify an
-		 * appropriate size for the kernel memory pool.
-		 */
-		#ifndef CONFIG_KERNEL_MEM_POOL
-			#error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without enabling KERNEL_MEM_POOL in Zephyr. Enable this option and allocate an appropriate size."
-		#endif
+    
+    /* While we could add CONFIG_KERNEL_MEM_POOL as a dependency for the 
+        * dynamic allocation option, we have opted to output and error if 
+        * the user have forgotten this since they also have to specify an
+        * appropriate size for the kernel memory pool.
+        */
+    #ifndef CONFIG_KERNEL_MEM_POOL
+        #error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without enabling KERNEL_MEM_POOL in Zephyr. Enable this option and allocate an appropriate size."
+    #endif
 
-		#if !defined(CONFIG_HEAP_MEM_POOL_SIZE) || ((CONFIG_HEAP_MEM_POOL_SIZE) < ((TRC_CFG_RTT_BUFFER_SIZE_UP) + (TRC_CFG_RTT_BUFFER_SIZE_DOWN)))
-			#error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without allocating enough memory for the KERNEL_MEM_POOL in Zephyr"
-		#endif
+    #if !defined(CONFIG_HEAP_MEM_POOL_SIZE) || ((CONFIG_HEAP_MEM_POOL_SIZE) < ((TRC_CFG_RTT_BUFFER_SIZE_UP) + (TRC_CFG_RTT_BUFFER_SIZE_DOWN)))
+        #error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without allocating enough memory for the KERNEL_MEM_POOL in Zephyr"
+    #endif
 
-		#define TRC_PORT_MALLOC(size) k_malloc(size)
+    #define TRC_PORT_MALLOC(size) k_malloc(size)
 #endif
 
 
@@ -86,7 +86,7 @@ traceResult xTraceKernelPortInitialize(TraceKernelPortDataBuffer_t* pxBuffer)
 	{
 		return TRC_FAIL;
 	}
-
+	
 	pxKernelPortData = (TraceKernelPortData_t*)pxBuffer;
 
 	pxKernelPortData->xSystemHeapHandle = 0;
@@ -125,7 +125,7 @@ void vTraceSetWorkQueueName(void* object, const char* name)
 {
 	xTraceObjectSetNameWithoutHandle(object, name);
 }
-	
+
 void vTraceSetHeapName(void* object, const char* name)
 {
 	xTraceObjectSetNameWithoutHandle(object, name);
@@ -199,7 +199,7 @@ void vTraceSetTimerName(void* object, const char* name)
 /**
  * @brief Initialize aspects of the recorder that must preceed the
  * kernel initialization (scheduling, threads, etc.).
- *
+ * 
  * @param arg
  */
 static int tracelyzer_pre_kernel_init(const struct device *arg)
@@ -211,7 +211,7 @@ static int tracelyzer_pre_kernel_init(const struct device *arg)
 #elif CONFIG_PERCEPIO_TRC_START_MODE_START_AWAIT_HOST
 	xTraceEnable(TRC_START_AWAIT_HOST);
 #else
-	xTraceEnable(TRC_INIT);
+	xTraceEnable(TRC_START_FROM_HOST);
 #endif
 
 	/* Create ISR handle */
@@ -1059,7 +1059,7 @@ void sys_trace_cancel_delayable_sync_exit(struct k_work_delayable *dwork, struct
 /* Work poll trace function definitions */
 void sys_trace_k_work_poll_init_enter(struct k_work_poll *work, k_work_handler_t handler) {
 	TraceEventHandle_t xTraceHandle;
-	
+
 	if (xTraceEventBegin(PSF_EVENT_PWORK_INIT_ENTER, sizeof(void*) + sizeof(void*),
 		&xTraceHandle) == TRC_SUCCESS) {
 		xTraceEventAddPointer(xTraceHandle, (void*)work);
@@ -1565,7 +1565,7 @@ void sys_trace_k_queue_queue_insert_blocking(struct k_queue *queue, bool alloc, 
 	if (!alloc) {
 		return;
 	}
-	
+
 	TraceEventHandle_t xTraceHandle;
 	
 	if (xTraceEventBegin(PSF_EVENT_QUEUE_QUEUE_INSERT_BLOCKING, sizeof(void*) + sizeof(void*),
