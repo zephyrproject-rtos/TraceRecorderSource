@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.0(RC1)
+ * Trace Recorder for Tracealyzer v4.6.3
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -12,28 +12,6 @@
 #include <kernel.h>
 #include <string.h>
 #include <trcRecorder.h>
-
-
-/* Ensure that CONFIG_MEM_POOL has been set when the user selects dynamic
- * allocation of the recorder buffer.
- */
-#if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC)
-    
-    /* While we could add CONFIG_KERNEL_MEM_POOL as a dependency for the 
-        * dynamic allocation option, we have opted to output and error if 
-        * the user have forgotten this since they also have to specify an
-        * appropriate size for the kernel memory pool.
-        */
-    #ifndef CONFIG_KERNEL_MEM_POOL
-        #error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without enabling KERNEL_MEM_POOL in Zephyr. Enable this option and allocate an appropriate size."
-    #endif
-
-    #if !defined(CONFIG_HEAP_MEM_POOL_SIZE) || ((CONFIG_HEAP_MEM_POOL_SIZE) < ((TRC_CFG_RTT_BUFFER_SIZE_UP) + (TRC_CFG_RTT_BUFFER_SIZE_DOWN)))
-        #error "Tracerecorder: You have choosen the TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC option without allocating enough memory for the KERNEL_MEM_POOL in Zephyr"
-    #endif
-
-    #define TRC_PORT_MALLOC(size) k_malloc(size)
-#endif
 
 
 /* Generic Zephyr system heap handle */
@@ -54,7 +32,7 @@ static K_THREAD_STACK_DEFINE(TzCtrl_thread_stack, (TRC_CFG_CTRL_TASK_STACK_SIZE)
  * interface (assuming TRC_STREAM_PORT_USE_INTERNAL_BUFFER == 1) and for
  * receiving commands from Tracealyzer. Also does some diagnostics.
  * 
- * @param _args
+ * @param[in] _args
  */
 void TzCtrl_thread_entry(void *_args)
 {
@@ -200,7 +178,7 @@ void vTraceSetTimerName(void* object, const char* name)
  * @brief Initialize aspects of the recorder that must preceed the
  * kernel initialization (scheduling, threads, etc.).
  * 
- * @param arg
+ * @param[in] arg
  */
 static int tracelyzer_pre_kernel_init(const struct device *arg)
 {
@@ -224,7 +202,7 @@ static int tracelyzer_pre_kernel_init(const struct device *arg)
  * @brief Initialize aspects of the recorder that depends on the kernel
  * being initialized.
  * 
- * @param arg
+ * @param[in] arg
  */
 static int tracealyzer_post_kernel_init(const struct device *arg)
 {
@@ -577,6 +555,26 @@ void sys_trace_k_thread_sched_wakeup(struct k_thread *thread) {
 
 void sys_trace_k_thread_sched_abort(struct k_thread *thread) {
 	TraceEventHandle_t xTraceHandle;
+	TraceEntryHandle_t xEntryHandle;
+
+	TRACE_ALLOC_CRITICAL_SECTION();
+	TRACE_ENTER_CRITICAL_SECTION();
+
+	/* Fetch entry handle */
+	if (xTraceEntryFind((void*)thread, &xEntryHandle) == TRC_FAIL)
+	{
+		TRACE_EXIT_CRITICAL_SECTION();
+		return;
+	}
+	
+	/* Delete entry */
+	if (xTraceEntryDelete(xEntryHandle) == TRC_FAIL)
+	{
+		TRACE_EXIT_CRITICAL_SECTION();
+		return;
+	}
+
+	TRACE_EXIT_CRITICAL_SECTION();
 
 	/* Remove thread from stack monitor */
 	xTraceStackMonitorRemove((void*)thread);
@@ -3236,16 +3234,38 @@ void sys_trace_k_timer_status_sync_exit(struct k_timer *timer, uint32_t result) 
 /* Syscall trace function definitions */
 void sys_trace_syscall_enter(uint32_t id, const char *name) {
 	TraceEventHandle_t xTraceHandle;
+	uint32_t uiRemainingBytes = 0;
+	uint32_t uiNull = 0;
 
-	if (xTraceEventBegin(PSF_EVENT_SYSTEM_SYSCALL_ENTER, 0, &xTraceHandle) == TRC_SUCCESS) {
+	if (xTraceEventBegin(PSF_EVENT_SYSTEM_SYSCALL_ENTER, sizeof(uint32_t) + strlen(name), &xTraceHandle) == TRC_SUCCESS) {
+		xTraceEventAdd32(xTraceHandle, id);
+
+		/* Add name */
+		xTraceEventAddData(xTraceHandle, (void*)name, strlen(name));
+
+		/* Events are 4-bytes aligned, pad remainder of data */
+		xTraceEventPayloadRemaining(xTraceHandle, &uiRemainingBytes);
+		xTraceEventAddData(xTraceHandle, (void*)&uiNull, uiRemainingBytes);
+
 		xTraceEventEnd(xTraceHandle);
 	}
 }
 
 void sys_trace_syscall_exit(uint32_t id, const char *name) {
 	TraceEventHandle_t xTraceHandle;
+	uint32_t uiRemainingBytes = 0;
+	uint32_t uiNull = 0;
 	
-	if (xTraceEventBegin(PSF_EVENT_SYSTEM_SYSCALL_EXIT, 0, &xTraceHandle) == TRC_SUCCESS) {
+	if (xTraceEventBegin(PSF_EVENT_SYSTEM_SYSCALL_EXIT, sizeof(uint32_t) + strlen(name), &xTraceHandle) == TRC_SUCCESS) {
+		xTraceEventAdd32(xTraceHandle, id);
+		
+		/* Add name */
+		xTraceEventAddData(xTraceHandle, (void*)name, strlen(name));
+
+		/* Events are 4-bytes aligned, pad remainder of data */
+		xTraceEventPayloadRemaining(xTraceHandle, &uiRemainingBytes);
+		xTraceEventAddData(xTraceHandle, (void*)&uiNull, uiRemainingBytes);
+
 		xTraceEventEnd(xTraceHandle);
 	}
 }

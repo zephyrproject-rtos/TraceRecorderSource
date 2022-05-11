@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.0(RC1)
+ * Trace Recorder for Tracealyzer v4.6.3
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -78,6 +78,20 @@ extern "C" {
 
 extern TraceHeapHandle_t xSystemHeapHandle;
 
+#if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC)
+#error "Dynamic allocation mode isn't supported for ThreadX, there is no system heap to allocate from. Use custom allocation mode to map trace buffer to your own heap."
+
+/**
+ * @internal Kernel port specific heap initialization
+ */
+#define TRC_KERNEL_PORT_HEAP_INIT(size)
+
+/**
+ * @internal Kernel port specific heap malloc definition
+ */
+#define TRC_KERNEL_PORT_HEAP_MALLOC(size) TX_NULL
+#endif /* (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC) */
+
 /**
  * @brief A structure representing the kernel port buffer.
  */
@@ -87,11 +101,11 @@ typedef struct TraceKernelPortDataBuffer
 } TraceKernelPortDataBuffer_t;
 
 /**
- * @brief Kernel port initialize callback.
+ * @internal Kernel port initialize callback.
  *
  * This function is called by the recorder as part of its initialization phase.
  *
- * @param pxBuffer Buffer
+ * @param[in] pxBuffer Buffer
  * @retval TRC_FAIL Initialization failed
  * @retval TRC_SUCCESS Success
  */
@@ -110,8 +124,8 @@ traceResult xTraceKernelPortEnable(void);
 /**
  * @brief Get unused stack size for kernel port thread.
  *
- * @param pvThread Thread
- * @param puxUnusedStack Destination variable
+ * @param[in] pvThread Thread
+ * @param[out] puxUnusedStack Unused stack
  * @retval TRC_FAIL Failed to get size
  * @retval TRC_SUCCESS Success
  */
@@ -135,48 +149,48 @@ unsigned char xTraceKernelPortIsSchedulerSuspended(void);
 /**
  * @brief Sets a name for Queue objects for display in Tracealyzer.
  *
- * @param object Pointer to the Queue that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Queue that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetQueueName(void* object, const char* name);
 
 /**
  * @brief Sets a name for Semaphore objects for display in Tracealyzer.
  *
- * @param object Pointer to the Seamaphore that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Seamaphore that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetSemaphoreName(void* object, const char* name);
 
 /**
  * @brief Sets a name for Mutex objects for display in Tracealyzer.
  *
- * @param object Pointer to the Mutex that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Mutex that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetMutexName(void* object, const char* name);
 
 /**
  * @brief Sets a name for Event Group objects for display in Tracealyzer.
  *
- * @param object Pointer to the Event Group that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Event Group that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetEventGroupName(void* object, const char* name);
 
 /**
  * @brief Sets a name for Stream Buffer objects for display in Tracealyzer.
  *
- * @param object Pointer to the Stream Buffer that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Stream Buffer that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetStreamBufferName(void* object, const char* name);
 
 /**
  * @brief Sets a name for Message Buffer objects for display in Tracealyzer.
  *
- * @param object Pointer to the Message Buffer that shall be named
- * @param name Name to set (const string literal)
+ * @param[in] object Pointer to the Message Buffer that shall be named
+ * @param[in] name Name to set (const string literal)
  */
 void vTraceSetMessageBufferName(void* object, const char* name);
 
@@ -196,11 +210,18 @@ void vTraceSetMessageBufferName(void* object, const char* name);
 #define PSF_EVENT_MALLOC_FAILED 									0
 #define PSF_EVENT_FREE												0
 #define PSF_EVENT_FREE_FAILED 										0
+#define PSF_EVENT_INTERVAL_CHANNEL_CREATE							0
+#define PSF_EVENT_INTERVAL_CHANNEL_SET_CREATE						0
 #define PSF_EVENT_INTERVAL_CREATE									0
 #define PSF_EVENT_INTERVAL_STATECHANGE								0
+#define PSF_EVENT_INTERVAL_CHANNEL_CREATE							0
+#define PSF_EVENT_INTERVAL_CHANNEL_SET_CREATE						0
+#define PSF_EVENT_INTERVAL_START									0
+#define PSF_EVENT_INTERVAL_STOP										0
 #define PSF_EVENT_TASK_DELETE										PSF_EVENT_THREAD_DELETE_SUCCESS
 #define PSF_EVENT_COUNTER_CREATE									0
 #define PSF_EVENT_COUNTER_CHANGE									0
+#define PSF_EVENT_COUNTER_LIMIT_EXCEEDED							0
 #define PSF_EVENT_EXTENSION_CREATE									0
 #define PSF_EVENT_HEAP_CREATE										0
 

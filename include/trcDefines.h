@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.0(RC1)
+ * Trace Recorder for Tracealyzer v4.6.3
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -79,8 +79,9 @@
 #define TRC_ENTRY_OPTION_EXTENSION				0x40000000
 #define TRC_ENTRY_OPTION_STATE_MACHINE			0x20000000
 #define TRC_ENTRY_OPTION_STATE_MACHINE_STATE	0x10000000
-#define TRC_ENTRY_OPTION_INTERVAL				0x08000000
+#define TRC_ENTRY_OPTION_INTERVAL_CHANNEL		0x08000000
 #define TRC_ENTRY_OPTION_COUNTER				0x04000000
+#define TRC_ENTRY_OPTION_INTERVAL_CHANNEL_SET	0x02000000
 
 #define TRC_RECORDER_COMPONENT_CORE						0x00000001
 #define TRC_RECORDER_COMPONENT_ASSERT					0x00000002
@@ -177,5 +178,6 @@
 #define TRC_HARDWARE_PORT_Win64							22	/*	Yes			FreeRTOS on Win64	*/
 #define TRC_HARDWARE_PORT_XMOS_XCOREAI                  23  /*  Yes         FreeRTOS SMP        */
 #define TRC_HARDWARE_PORT_RISCV_RV32I					24	/*	Yes			FreeRTOS			*/
+#define TRC_HARDWARE_PORT_CYCLONE_V_HPS					25  /*	Yes			FreeRTOS			*/
 
 #endif /* TRC_PORTDEFINES_H */

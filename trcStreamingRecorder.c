@@ -1,5 +1,5 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.0(RC1)
+ * Trace Recorder for Tracealyzer v4.6.3
  * Copyright 2021 Percepio AB
  * www.percepio.com
  *
@@ -13,6 +13,10 @@
 #if (TRC_CFG_RECORDER_MODE == TRC_RECORDER_MODE_STREAMING)
 
 #if (TRC_USE_TRACEALYZER_RECORDER == 1)
+
+#ifndef TRC_KERNEL_PORT_HEAP_INIT
+#define TRC_KERNEL_PORT_HEAP_INIT(__size) 
+#endif
 
 typedef struct TraceHeader
 {
@@ -47,6 +51,9 @@ typedef struct TraceCommandType_t
 
 /* Used to interpret the data format */
 #define TRACE_FORMAT_VERSION ((uint16_t)0x000A)
+
+/* Used to determine endian of data (big/little) */
+#define TRACE_PSF_ENDIANESS_IDENTIFIER ((uint32_t)0x50534600)
 
 #if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_STATIC)
 static TraceRecorderData_t xRecorderData TRC_CFG_RECORDER_DATA_ATTRIBUTE;
@@ -129,7 +136,11 @@ traceResult xTraceInitialize(void)
 	}
 
 #if (TRC_CFG_RECORDER_BUFFER_ALLOCATION == TRC_RECORDER_BUFFER_ALLOCATION_DYNAMIC)
-	pxRecorderData = TRC_MALLOC(sizeof(TraceRecorderData_t));
+	/* Initialize heap */
+	TRC_KERNEL_PORT_HEAP_INIT(sizeof(TraceRecorderData_t));
+
+	/* Allocate data */
+	pxTraceRecorderData = TRC_KERNEL_PORT_HEAP_MALLOC(sizeof(TraceRecorderData_t));
 #endif
 
 	/* These are set on init so they aren't overwritten by late initialization values. */
@@ -249,8 +260,8 @@ traceResult xTraceHeaderInitialize(TraceHeaderBuffer_t *pxBuffer)
 	/* Lowest bit used for TRC_IRQ_PRIORITY_ORDER */
 	pxHeader->uiOptions = ((TRC_IRQ_PRIORITY_ORDER) << 0);
 
-	/* 3rd bit used for TRC_CFG_DEBUG_EXPECT */
-	pxHeader->uiOptions |= ((TRC_CFG_DEBUG_EXPECT) << 2);
+	/* 3rd bit used for TRC_CFG_TEST_MODE */
+	pxHeader->uiOptions |= ((TRC_CFG_TEST_MODE) << 2);
 
 	return TRC_SUCCESS;
 }
@@ -397,6 +408,16 @@ traceResult xTraceTzCtrl(void)
 	return TRC_SUCCESS;
 }
 
+void vTraceSetFilterGroup(uint16_t filterGroup)
+{
+	(void)filterGroup;
+}
+
+void vTraceSetFilterMask(uint16_t filterMask)
+{
+	(void)filterMask;
+}
+
 /******************************************************************************/
 /*** INTERNAL FUNCTIONS *******************************************************/
 /******************************************************************************/
@@ -404,6 +425,7 @@ traceResult xTraceTzCtrl(void)
 static void prvSetRecorderEnabled(void)
 {
 	uint32_t timestampFrequency = 0;
+	uint32_t timestampPeriod = 0;
 	
 	TRACE_ALLOC_CRITICAL_SECTION();
 	
@@ -413,11 +435,17 @@ static void prvSetRecorderEnabled(void)
 	}
 
 	xTraceTimestampGetFrequency(&timestampFrequency);
-	/* If not overridden using 	xTraceTimestampSetFrequency(...), use default value */
+	/* If not overridden using xTraceTimestampSetFrequency(...), use default value */
 	if (timestampFrequency == 0)
 	{
-		timestampFrequency = TRC_HWTC_FREQ_HZ;
-		xTraceTimestampSetFrequency(timestampFrequency);
+		xTraceTimestampSetFrequency((TraceUnsignedBaseType_t)(TRC_HWTC_FREQ_HZ));
+	}
+
+	xTraceTimestampGetPeriod(&timestampPeriod);
+	/* If not overridden using xTraceTimestampSetPeriod(...), use default value */
+	if (timestampPeriod == 0)
+	{
+		xTraceTimestampSetPeriod((TraceUnsignedBaseType_t)(TRC_HWTC_PERIOD));
 	}
 
 	TRACE_ENTER_CRITICAL_SECTION();
@@ -474,9 +502,6 @@ static void prvTraceStoreHeader(void)
 static void prvTraceStoreTimestampInfo(void)
 {
 	TraceEventHandle_t xEventHandle;
-	uint32_t timestampFrequency = 0;
-
-	xTraceTimestampGetFrequency(&timestampFrequency);
 
 	if (xTraceEventBeginRawOfflineBlocking(sizeof(TraceTimestampBuffer_t), &xEventHandle) == TRC_SUCCESS)
 	{
