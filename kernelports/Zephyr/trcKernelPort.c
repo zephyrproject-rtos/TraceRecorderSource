@@ -306,7 +306,7 @@ void sys_trace_k_thread_create(struct k_thread *thread, size_t stack_size, int p
 	}
 
 #ifdef CONFIG_THREAD_NAME
-	if (thread->name != NULL && strlen(thread->name) > 0) {
+	if (strlen(thread->name) > 0) {
 		xTraceObjectSetName(xEntryHandle, thread->name);
 	}
 #endif
