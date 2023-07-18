@@ -1260,7 +1260,7 @@ void sys_trace_isr_enter(void);
 void sys_trace_isr_exit(void);
 
 #ifdef __cplusplus
-extern "C"
+}
 #endif
 
 #endif /*_TRACE_TRACERECORDER_H*/
