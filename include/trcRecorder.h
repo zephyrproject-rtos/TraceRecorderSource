@@ -1,6 +1,6 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.6
- * Copyright 2021 Percepio AB
+ * Trace Recorder for Tracealyzer v4.8.0.hotfix1
+ * Copyright 2023 Percepio AB
  * www.percepio.com
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -31,18 +31,20 @@ extern "C" {
 #include <trcDefines.h>
 #include <trcConfig.h>
 #include <trcKernelPortConfig.h>
-#include <trcTypes.h>
 
-#ifndef TRC_CFG_TEST_MODE
-#define TRC_CFG_TEST_MODE 0
-#endif
-
-/* Unless defined by the kernel port, we assume there is no support for
- * the classic snapshot mode and default to streaming mode where
+/* If TRC_CFG_RECORDER_MODE is not defined we assume there is no support
+ * for the classic snapshot mode and default to streaming mode where
  * the new RingBuffer snapshot mode provides snapshot functionality.
  */
 #ifndef TRC_CFG_RECORDER_MODE
 #define TRC_CFG_RECORDER_MODE TRC_RECORDER_MODE_STREAMING
+#endif
+
+/* Some types may be defined differently based on TRC_CFG_RECORDER_MODE */
+#include <trcTypes.h>
+
+#ifndef TRC_CFG_TEST_MODE
+#define TRC_CFG_TEST_MODE 0
 #endif
 
 #if (TRC_CFG_RECORDER_MODE == TRC_RECORDER_MODE_SNAPSHOT)
@@ -74,6 +76,11 @@ typedef uint8_t traceHandle;
 #include <trcKernelPort.h>
 
 /* Not yet available in snapshot mode */
+#define xTracePrintFormat0(_c, _f) 
+#define xTracePrintFormat1(_c, _f, _p1) 
+#define xTracePrintFormat2(_c, _f, _p1, _p2) 
+#define xTracePrintFormat3(_c, _f, _p1, _p2, _p3) 
+#define xTracePrintFormat4(_c, _f, _p1, _p2, _p3, _p4) 
 #define vTraceConsoleChannelPrintF(fmt, ...) (void)
 #define xTraceConsoleChannelPrintF(fmt, ...) (void)
 #define prvTraceStoreEvent_None(...) 
@@ -111,15 +118,15 @@ typedef uint8_t traceHandle;
 #define traceHandle TraceISRHandle_t
 
 /* Maximum event size */
-#define TRC_MAX_BLOB_SIZE (16 * sizeof(uint32_t))
+#define TRC_MAX_BLOB_SIZE (16UL * sizeof(TraceUnsignedBaseType_t))
 
 /* Platform name length */
-#define TRC_PLATFORM_CFG_LENGTH 8
+#define TRC_PLATFORM_CFG_LENGTH 8UL
 
 /* Header size */
-#define TRC_HEADER_BUFFER_SIZE (sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + (sizeof(char) * (TRC_PLATFORM_CFG_LENGTH)) + sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint8_t))
+#define TRC_HEADER_BUFFER_SIZE (sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint16_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint16_t) + sizeof(uint8_t) + sizeof(uint8_t) + (sizeof(char) * (TRC_PLATFORM_CFG_LENGTH)))
 
-typedef struct TraceHeaderBuffer
+typedef struct TraceHeaderBuffer	/* Aligned */
 {
 	uint8_t buffer[TRC_HEADER_BUFFER_SIZE];
 } TraceHeaderBuffer_t;
@@ -146,6 +153,8 @@ typedef struct TraceHeaderBuffer
 #include <trcInternalEventBuffer.h>
 #include <trcDiagnostics.h>
 #include <trcAssert.h>
+#include <trcRunnable.h>
+#include <trcDependency.h>
 
 #endif /* (TRC_CFG_RECORDER_MODE == TRC_RECORDER_MODE_STREAMING) */
 
@@ -163,9 +172,13 @@ typedef struct TraceHeaderBuffer
 /**
  * @brief
  *
- * Initializes the recorder data. xTraceInitialize() or xTraceEnable(...)
- * must be called before any attempts at adding trace data/information.
- * See xTraceEnable(...) for more information. 
+ * Initializes the recorder data.
+ * xTraceInitialize() or xTraceEnable(...) must be called before any attempts
+ * at adding trace data/information. xTraceInitialize() can be called before
+ * timestamp source is initialized since timestamps aren't used until
+ * xTraceEnable(...) is called.
+ *
+ * See xTraceEnable(...) for more information.
  * 
  * @retval TRC_FAIL Failure
  * @retval TRC_SUCCESS Success
@@ -178,6 +191,11 @@ traceResult xTraceInitialize(void);
  * This function enables tracing.
  * To use the trace recorder, the startup must call xTraceInitialize() or
  * xTraceEnable(...) before any RTOS calls are made (including "create" calls).
+ * This function should only be called after the timestamp source is properly
+ * initialized. If kernel services that generate trace data are called before that,
+ * an earlier call to xTraceInitialize() is necessary. Then call xTraceEnable(...)
+ * once the timestamp source is initialized.
+ *
  * Three start options are provided:
  * 
  * 	TRC_START: Starts the tracing directly. In snapshot mode this allows for 
@@ -1593,7 +1611,7 @@ void prvTraceSetObjectName(traceObjectClass objectclass,
 #define TRACE_ASSERT(eval, msg, defRetVal)
 #endif
 
-typedef RecorderDataType TraceRecorderDataBuffer_t;
+typedef RecorderDataType TraceRecorderData_t;
 
 #endif /*(TRC_CFG_RECORDER_MODE == TRC_RECORDER_MODE_SNAPSHOT)*/
 
@@ -1603,39 +1621,36 @@ typedef RecorderDataType TraceRecorderDataBuffer_t;
 #define TRC_EXTERNAL_BUFFERS 0
 #endif
 
-typedef struct TraceRecorderData
+typedef struct TraceRecorderData	/* Aligned */
 {
 	uint32_t uiSessionCounter;
 	uint32_t uiRecorderEnabled;
-	uint32_t uiTraceSystemState;
+	TraceUnsignedBaseType_t uxTraceSystemStates[TRC_CFG_CORE_COUNT];
+	uint32_t reserved;								/* alignment */
 
-	TraceAssertBuffer_t xAssertBuffer;
+	TraceAssertData_t xAssertBuffer;				/* aligned */
+	TraceEntryIndexTable_t xEntryIndexTableBuffer;	/* aligned */
 #if (TRC_EXTERNAL_BUFFERS == 0)
-	TraceHeaderBuffer_t xHeaderBuffer;
-	TraceEntryTableBuffer_t xEntryTableBuffer;
-	TraceTimestampBuffer_t xTimestampBuffer;
+	TraceHeaderBuffer_t xHeaderBuffer;				/* aligned */
+	TraceEntryTable_t xEntryTable;					/* aligned */
+	TraceTimestampData_t xTimestampBuffer;			/* aligned */
 #endif
-	TraceStreamPortBuffer_t xStreamPortBuffer;
-	TraceStaticBufferBuffer_t xStaticBufferBuffer;
-	TraceEventDataBuffer_t xEventDataBuffer;
-	TracePrintBuffer_t xPrintBuffer;
-	TraceErrorBuffer_t xErrorBuffer;
-	TraceISRInfoBuffer_t xISRInfoBuffer;
-	TraceKernelPortDataBuffer_t xKernelPortBuffer;
-	TraceTaskInfoBuffer_t xTaskInfoBuffer;
-	TraceStackMonitorBuffer_t xStackMonitorBuffer;
-	TraceDiagnosticsBuffer_t xDiagnosticsBuffer;
+	TraceStreamPortBuffer_t xStreamPortBuffer;		/* verify alignment in xTraceInitialize() */
+	TraceStaticBufferTable_t xStaticBufferBuffer;	/* aligned */
+	TraceEventDataTable_t xEventDataBuffer;			/* verify alignment in xTraceInitialize() */
+	TracePrintData_t xPrintBuffer;					/* aligned */
+	TraceErrorData_t xErrorBuffer;					/* aligned */
+	TraceISRData_t xISRBuffer;						/* aligned */
+	TraceKernelPortDataBuffer_t xKernelPortBuffer;	/* verify alignment in xTraceInitialize() */
+	TraceTaskData_t xTaskInfoBuffer;				/* aligned */
+	TraceStackMonitorData_t xStackMonitorBuffer;	/* aligned */
+	TraceDiagnosticsData_t xDiagnosticsBuffer;		/* aligned */
+	TraceExtensionData_t xExtensionBuffer;			/* aligned */
+	TraceCounterData_t xCounterBuffer;				/* aligned */
 } TraceRecorderData_t;
 
 extern TraceRecorderData_t* pxTraceRecorderData;
 extern uint32_t RecorderInitialized;
-
-#define TRC_RECORDER_DATA_BUFFER_SIZE (sizeof(TraceRecorderData_t))
-
-typedef struct TraceRecorderDataBuffer
-{
-	uint8_t buffer[(TRC_RECORDER_DATA_BUFFER_SIZE)];
-} TraceRecorderDataBuffer_t;
 
 /**
  * @brief Initializes the header data
@@ -1650,15 +1665,15 @@ traceResult xTraceHeaderInitialize(TraceHeaderBuffer_t* pxBuffer);
 /**
  * @brief Query if recorder is enabled
  *
- * @retval 1 Recorder enabled
+ * @retval Non-zero Recorder enabled
  * @retval 0 Recorder not enabled
  */
-#define xTraceIsRecorderEnabled() (xTraceIsRecorderInitialized() & pxTraceRecorderData->uiRecorderEnabled)
+#define xTraceIsRecorderEnabled() (xTraceIsRecorderInitialized() && pxTraceRecorderData->uiRecorderEnabled)
 
 /**
  * @brief Query if recorder initialized
  *
- * @retval 1 Recorder initialized
+ * @retval Non-zero Recorder initialized
  * @retval 0 Recorder not initialized
  */
 #define xTraceIsRecorderInitialized() xTraceIsComponentInitialized(TRC_RECORDER_COMPONENT_CORE)
@@ -1678,10 +1693,10 @@ traceResult xTraceHeaderInitialize(TraceHeaderBuffer_t* pxBuffer);
  * 
  * @param[in] uiComponentBit Component bit
  * 
- * @retval 1 Component initialized
+ * @retval Non-zero Component initialized
  * @retval 0 Component not initialized
  */
-#define xTraceIsComponentInitialized(uiComponentBit) ((RecorderInitialized & (uiComponentBit)) ? 1 : 0)
+#define xTraceIsComponentInitialized(uiComponentBit) (RecorderInitialized & (uiComponentBit))
 
 /**
  * @brief Set the trace state
@@ -1691,7 +1706,7 @@ traceResult xTraceHeaderInitialize(TraceHeaderBuffer_t* pxBuffer);
  * @retval TRC_FAIL Failure
  * @retval TRC_SUCCESS Success
  */
-#define xTraceStateSet(uiState) TRC_COMMA_EXPR_TO_STATEMENT_EXPR_2(pxTraceRecorderData->uiTraceSystemState = (uiState), TRC_SUCCESS)
+#define xTraceStateSet(uxState) TRC_COMMA_EXPR_TO_STATEMENT_EXPR_2(pxTraceRecorderData->uxTraceSystemStates[TRC_CFG_GET_CURRENT_CORE()] = (uxState), TRC_SUCCESS)
 
 /**
  * @brief Query the trace state
@@ -1701,7 +1716,7 @@ traceResult xTraceHeaderInitialize(TraceHeaderBuffer_t* pxBuffer);
  * @retval TRC_FAIL Failure
  * @retval TRC_SUCCESS Success
  */
-#define xTraceStateGet(puiState) TRC_COMMA_EXPR_TO_STATEMENT_EXPR_2(*(puiState) = pxTraceRecorderData->uiTraceSystemState, TRC_SUCCESS)
+#define xTraceStateGet(puxState) TRC_COMMA_EXPR_TO_STATEMENT_EXPR_2(*(puxState) = pxTraceRecorderData->uxTraceSystemStates[TRC_CFG_GET_CURRENT_CORE()], TRC_SUCCESS)
 
 /**
  * @brief Call this function periodically
@@ -1720,14 +1735,7 @@ traceResult xTraceTzCtrl(void);
  * 
  * @param[in] _eventID Event id
  */
-#define prvTraceStoreEvent_None(_eventID) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, 0, &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_None(_eventID) xTraceEventCreate0(_eventID)
 
 /**
  * @brief Stores an event with a handle parameter
@@ -1735,107 +1743,53 @@ traceResult xTraceTzCtrl(void);
  * @param[in] _eventID Event id
  * @param[in] _handle Handle
  */
-#define prvTraceStoreEvent_Handle(_eventID, _handle) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(void*), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAddPointer(_xEventHandle, (void*)(_handle)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_Handle(_eventID, _handle) xTraceEventCreate1(_eventID, (TraceUnsignedBaseType_t)(_handle))
 
 /**
- * @brief Stores an event with one 32-bit parameter
+ * @brief Stores an event with one parameter
  * 
  * @param[in] _eventID Event id
  * @param[in] _param1 Param
  */
-#define prvTraceStoreEvent_Param(_eventID, _param1) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(uint32_t), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param1)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_Param(_eventID, _param1)  xTraceEventCreate1(_eventID, (TraceUnsignedBaseType_t)(_param1))
 
 /**
- * @brief Stores an event with a handle and one 32-bit parameter
+ * @brief Stores an event with a handle and one parameter
  * 
  * @param[in] _eventID Event id
  * @param[in] _handle Handle
  * @param[in] _param1 Param
  */
-#define prvTraceStoreEvent_HandleParam(_eventID, _handle, _param1) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(void*) + sizeof(uint32_t), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAddPointer(_xEventHandle, (void*)(_handle)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param1)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_HandleParam(_eventID, _handle, _param1) xTraceEventCreate2(_eventID, (TraceUnsignedBaseType_t)(_handle), (TraceUnsignedBaseType_t)(_param1))
 
 /**
- * @brief Stores an event with two 32-bit parameters
+ * @brief Stores an event with two parameters
  * 
  * @param[in] _eventID Event id
  * @param[in] _param1 Param 1
  * @param[in] _param2 Param 2
  */
-#define prvTraceStoreEvent_ParamParam(_eventID, _param1, _param2) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(uint32_t) + sizeof(uint32_t), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param1)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param2)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_ParamParam(_eventID, _param1, _param2) xTraceEventCreate2(_eventID, (TraceUnsignedBaseType_t)(_param1), (TraceUnsignedBaseType_t)(_param2))
 
 /**
- * @brief Stores an event with a handle and two 32-bit parameters
+ * @brief Stores an event with a handle and two parameters
  * 
  * @param[in] _eventID Event id
  * @param[in] _handle Handle
  * @param[in] _param1 Param 1
  * @param[in] _param2 Param 2
  */
-#define prvTraceStoreEvent_HandleParamParam(_eventID, _handle, _param1, _param2) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(void*) + sizeof(uint32_t) + sizeof(uint32_t), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAddPointer(_xEventHandle, (void*)(_handle)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param1)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param2)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_HandleParamParam(_eventID, _handle, _param1, _param2) xTraceEventCreate3(_eventID, (TraceUnsignedBaseType_t)(_handle), (TraceUnsignedBaseType_t)(_param1), (TraceUnsignedBaseType_t)(_param2))
 
 /**
- * @brief Stores an event with three 32-bit parameters
+ * @brief Stores an event with three parameters
  * 
  * @param[in] _eventID Event id
  * @param[in] _param1 Param 1
  * @param[in] _param2 Param 2
  * @param[in] _param3 Param 3
  */
-#define prvTraceStoreEvent_ParamParamParam(_eventID, _param1, _param2, _param3) \
-	{ \
-		TraceEventHandle_t _xEventHandle = 0; \
-		if (xTraceEventBegin(_eventID, sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint32_t), &_xEventHandle) == TRC_SUCCESS) \
-		{ \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param1)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param2)); \
-			xTraceEventAdd32(_xEventHandle, (uint32_t)(_param3)); \
-			xTraceEventEnd(_xEventHandle); \
-		} \
-	}
+#define prvTraceStoreEvent_ParamParamParam(_eventID, _param1, _param2, _param3) xTraceEventCreate3(_eventID, (TraceUnsignedBaseType_t)(_param1), (TraceUnsignedBaseType_t)(_param2), (TraceUnsignedBaseType_t)(_param3))
 
 /**
  * @brief Snapshot mode only. Trace stop hook.
@@ -1860,7 +1814,7 @@ traceResult xTraceTzCtrl(void);
  * @retval TRC_FAIL Failure
  * @retval TRC_SUCCESS Success
  */
-traceResult xTraceSetBuffer(TraceRecorderDataBuffer_t *pxBuffer);
+traceResult xTraceSetBuffer(TraceRecorderData_t *pxBuffer);
 #else
 #define xTraceSetBuffer(p) (TRC_SUCCESS)
 #endif
@@ -1914,7 +1868,7 @@ traceResult xTraceGetEventBuffer(void** ppvBuffer, TraceUnsignedBaseType_t * pui
 
 #define vTraceSetStopHook(x) (void)(x)
 
-#define TraceRecorderDataBuffer_t uint32_t
+#define TraceRecorderData_t uint32_t
 
 #endif /* (TRC_USE_TRACEALYZER_RECORDER == 1) */
 
@@ -1961,7 +1915,7 @@ traceResult xTraceGetEventBuffer(void** ppvBuffer, TraceUnsignedBaseType_t * pui
 /**
  * @deprecated Backwards compatibility. Use xTraceSetBuffer instead.
  */
-#define vTraceSetRecorderDataBuffer(pxBuffer) xTraceSetBuffer((TraceRecorderDataBuffer_t*)(pxBuffer))
+#define vTraceSetRecorderDataBuffer(pxBuffer) xTraceSetBuffer((TraceRecorderData_t*)(pxBuffer))
 
 #ifdef __cplusplus
 }

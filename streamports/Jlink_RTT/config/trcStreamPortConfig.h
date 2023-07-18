@@ -1,6 +1,6 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.6
- * Copyright 2021 Percepio AB
+ * Trace Recorder for Tracealyzer v4.8.0.hotfix1
+ * Copyright 2023 Percepio AB
  * www.percepio.com
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -15,18 +15,64 @@
 extern "C" {
 #endif
 
-/* This define will determine whether to use the internal buffer or not.
-If file writing creates additional trace events (i.e. it uses semaphores or mutexes),
-then the internal buffer must be enabled to avoid infinite recursion. */
+/**
+ * @def TRC_CFG_STREAM_PORT_USE_INTERNAL_BUFFER
+ *
+ * @brief This define will determine whether to use the internal buffer or not.
+ * If file writing creates additional trace events (i.e. it uses semaphores or mutexes),
+ * then the internal buffer must be enabled to avoid infinite recursion.
+ */
 #define TRC_CFG_STREAM_PORT_USE_INTERNAL_BUFFER 0
 
 /**
-* @def TRC_CFG_INTERNAL_BUFFER_SIZE
-*
-* @brief Configures the size of the internal buffer if used.
-* is enabled.
-*/
-#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_SIZE 5000
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_SIZE
+ *
+ * @brief Configures the size of the internal buffer if used.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_SIZE 5120
+
+/**
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_WRITE_MODE
+ *
+ * @brief This should be set to TRC_INTERNAL_EVENT_BUFFER_OPTION_WRITE_MODE_DIRECT for best performance.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_WRITE_MODE TRC_INTERNAL_EVENT_BUFFER_OPTION_WRITE_MODE_DIRECT
+
+/**
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_TRANSFER_MODE
+ *
+ * @brief Defines if the internal buffer will attempt to transfer all data each time or limit it to a chunk size.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_TRANSFER_MODE TRC_INTERNAL_EVENT_BUFFER_OPTION_TRANSFER_MODE_ALL
+
+/**
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_SIZE
+ *
+ * @brief Defines the maximum chunk size when transferring
+ * internal buffer events in chunks.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_SIZE 1024
+
+/**
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_SIZE_LIMIT
+ *
+ * @brief Defines the number of transferred bytes needed to trigger another transfer.
+ * It also depends on TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_COUNT_LIMIT to set a maximum number
+ * of additional transfers this loop.
+ * This will increase throughput by immediately doing a transfer and not wait for another xTraceTzCtrl() loop.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_SIZE_LIMIT 256
+
+/**
+ * @def TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_COUNT_LIMIT
+ *
+ * @brief Defines the maximum number of times to trigger another transfer before returning to xTraceTzCtrl().
+ * It also depends on TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_SIZE_LIMIT to see if a meaningful amount of data was
+ * transferred in the last loop.
+ * This will increase throughput by immediately doing a transfer and not wait for another xTraceTzCtrl() loop.
+ */
+#define TRC_CFG_STREAM_PORT_INTERNAL_BUFFER_CHUNK_TRANSFER_AGAIN_COUNT_LIMIT 5
+
 
 /**
 * @def TRC_CFG_STREAM_PORT_RTT_UP_BUFFER_SIZE
@@ -37,13 +83,13 @@ then the internal buffer must be enabled to avoid infinite recursion. */
 * This setting is ignored for RTT buffer 0, which can't be reconfigured
 * in runtime and therefore hard-coded to use the defines in SEGGER_RTT_Conf.h.
 *
-* Default buffer size for Tracealyzer is 5000 bytes. 
+* Default buffer size for Tracealyzer is 5120 bytes. 
 *
 * If you have a stand-alone J-Link probe, the can be decreased to around 1 KB.
 * But integrated J-Link OB interfaces are slower and needs about 5-10 KB, 
 * depending on the amount of data produced.
 */
-#define TRC_CFG_STREAM_PORT_RTT_UP_BUFFER_SIZE 5000
+#define TRC_CFG_STREAM_PORT_RTT_UP_BUFFER_SIZE 5120
 
 /**
 * @def TRC_CFG_STREAM_PORT_RTT_DOWN_BUFFER_SIZE
@@ -102,7 +148,7 @@ then the internal buffer must be enabled to avoid infinite recursion. */
 * Tracealyzer will report lost events if the transfer is not
 * fast enough. In that case, try increasing the size of the "up buffer".
 */
-#define TRC_CFG_STREAM_PORT_RTT_MODE SEGGER_RTT_MODE_BLOCK_IF_FIFO_FULL
+#define TRC_CFG_STREAM_PORT_RTT_MODE SEGGER_RTT_MODE_NO_BLOCK_SKIP
 
 /**
  * @def TRC_CFG_STREAM_PORT_RTT_NO_LOCK_WRITE

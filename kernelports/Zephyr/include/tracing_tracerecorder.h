@@ -1,6 +1,6 @@
 /*
- * Trace Recorder for Tracealyzer v4.6.6
- * Copyright 2021 Percepio AB
+ * Trace Recorder for Tracealyzer v4.8.0.hotfix1
+ * Copyright 2023 Percepio AB
  * www.percepio.com
  *
  * SPDX-License-Identifier: Apache-2.0
@@ -13,6 +13,9 @@
 #include <zephyr/init.h>
 #include <trcRecorder.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Legacy trace defines that are pending refactoring/removal by
  * the Zephyr team.
@@ -982,8 +985,8 @@ void sys_trace_k_poll_api_signal_raise(struct k_poll_signal *signal,
 
 
 /* Semaphore trace function declarations */
-void sys_trace_k_sem_init(struct k_sem *sem, uint32_t initial_count,
-    uint32_t limit, int ret);
+void sys_trace_k_sem_init(struct k_sem *sem, unsigned int initial_count,
+    unsigned int limit, int ret);
 void sys_trace_k_sem_give_enter(struct k_sem *sem);
 void sys_trace_k_sem_take_enter(struct k_sem *sem, k_timeout_t timeout);
 void sys_trace_k_sem_take_blocking(struct k_sem *sem, k_timeout_t timeout);
@@ -1255,5 +1258,9 @@ void sys_trace_syscall_exit(uint32_t id, const char *name);
 void sys_trace_idle(void);
 void sys_trace_isr_enter(void);
 void sys_trace_isr_exit(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /*_TRACE_TRACERECORDER_H*/
